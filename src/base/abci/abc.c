@@ -407,6 +407,7 @@ static int Abc_CommandAbc9Load               ( Abc_Frame_t * pAbc, int argc, cha
 static int Abc_CommandAbc9Load2              ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9LoadAig            ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Read               ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Segfault           ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9ReadBlif           ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9ReadCBlif          ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9ReadStg            ( Abc_Frame_t * pAbc, int argc, char ** argv );
@@ -1214,6 +1215,7 @@ void Abc_Init( Abc_Frame_t * pAbc )
     Cmd_CommandAdd( pAbc, "ABC9",         "&loadaig",      Abc_CommandAbc9LoadAig,      0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&r",            Abc_CommandAbc9Read,         0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&read",         Abc_CommandAbc9Read,         0 );
+    Cmd_CommandAdd( pAbc, "ABC9",         "&segfault",     Abc_CommandAbc9Segfault,     0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&read_blif",    Abc_CommandAbc9ReadBlif,     0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&read_cblif",   Abc_CommandAbc9ReadCBlif,    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&read_stg",     Abc_CommandAbc9ReadStg,      0 );
@@ -32563,6 +32565,17 @@ usage:
     Abc_Print( -2, "\t-h     : print the command usage\n");
     Abc_Print( -2, "\t<file> : the file name\n");
     return 1;
+}
+
+#include <signal.h>
+int Abc_CommandAbc9Segfault( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    (void)pAbc;
+    (void)argc;
+    (void)argv;
+    Abc_Print( -1, "Raising SIGSESGV deliberately.\n" );
+    raise(SIGSEGV);
+    return 0;
 }
 
 /**Function*************************************************************
