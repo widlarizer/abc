@@ -3027,6 +3027,7 @@ int Gia_ManMiter_rec( Gia_Man_t * pNew, Gia_Man_t * p, Gia_Obj_t * pObj )
 ***********************************************************************/
 Gia_Man_t * Gia_ManMiter( Gia_Man_t * p0, Gia_Man_t * p1, int nInsDup, int fDualOut, int fSeq, int fImplic, int fVerbose )
 {
+    extern void Gia_ManCleanupRemap( Gia_Man_t * p, Gia_Man_t * pGia );
     Gia_Man_t * pNew, * pTemp;
     Gia_Obj_t * pObj;
     int i, iLit;
@@ -3154,9 +3155,13 @@ Gia_Man_t * Gia_ManMiter( Gia_Man_t * p0, Gia_Man_t * p1, int nInsDup, int fDual
     }
     Gia_ManHashStop( pNew );
     pNew = Gia_ManCleanup( pTemp = pNew );
+    Gia_ManCleanupRemap( p0, pTemp );
+    Gia_ManCleanupRemap( p1, pTemp );
     Gia_ManStop( pTemp );
 
     pNew = Gia_ManDupNormalize( pTemp = pNew, 0 );
+    Gia_ManCleanupRemap( p0, pTemp );
+    Gia_ManCleanupRemap( p1, pTemp );
     Gia_ManStop( pTemp );
     return pNew;
 }
