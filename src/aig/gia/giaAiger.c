@@ -174,7 +174,49 @@ Vec_Str_t * Gia_AigerWriteLiterals( Vec_Int_t * vLits )
   SeeAlso     []
 
 ***********************************************************************/
+/**Function*************************************************************
+
+  Synopsis    [Moves file literals onto the duplicate of pOld.]
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static void Gia_AigerRemapFileLits( Vec_Int_t * vFileLits, Gia_Man_t * pOld )
+{
+    Gia_Obj_t * pObj;
+    int i, iLit;
+    if ( vFileLits == NULL )
+        return;
+    Vec_IntForEachEntry( vFileLits, iLit, i )
+    {
+        if ( iLit < 0 )
+            continue;
+        pObj = Gia_ManObj( pOld, Abc_Lit2Var(iLit) );
+        Vec_IntWriteEntry( vFileLits, i, ~pObj->Value ? Abc_LitNotCond(pObj->Value, Abc_LitIsCompl(iLit)) : -1 );
+    }
+}
+
 Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSimple, int fSkipStrash, int fCheck )
+{
+    return Gia_AigerReadFromMemoryFileLits( pContents, nFileSize, fGiaSimple, fSkipStrash, fCheck, NULL );
+}
+
+/**Function*************************************************************
+
+  Synopsis    [Reads the AIG and optionally maps each file variable to its literal in the result.]
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+Gia_Man_t * Gia_AigerReadFromMemoryFileLits( char * pContents, int nFileSize, int fGiaSimple, int fSkipStrash, int fCheck, Vec_Int_t ** pvFileLits )
 {
     Gia_Man_t * pNew, * pTemp;
     Vec_Ptr_t * vNamesIn = NULL, * vNamesOut = NULL, * vNamesRegIn = NULL, * vNamesRegOut = NULL, * vNamesNode = NULL;
@@ -185,6 +227,9 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
     int nBad = 0, nConstr = 0, nJust = 0, nFair = 0;
     unsigned char * pDrivers, * pSymbols, * pCur;
     unsigned uLit0, uLit1, uLit;
+
+    if ( pvFileLits )
+        *pvFileLits = NULL;
 
     // read the parameters (M I L O A + B C J F)
     pCur = (unsigned char *)pContents;         while ( *pCur != ' ' ) pCur++; pCur++;
@@ -953,7 +998,10 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
     }
 
     // skipping the comments
-    Vec_IntFree( vNodes );
+    if ( pvFileLits )
+        *pvFileLits = vNodes;
+    else
+        Vec_IntFree( vNodes );
 
     // update polarity of the additional outputs
     if ( nBad || nConstr || nJust || nFair )
@@ -963,6 +1011,7 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
     if ( vPoTypes )
     {
         pNew = Gia_ManDupWithConstraints( pTemp = pNew, vPoTypes );
+        Gia_AigerRemapFileLits( pvFileLits ? *pvFileLits : NULL, pTemp );
         Gia_ManStop( pTemp );
         Vec_IntFreeP( &vPoTypes );
     }
@@ -982,6 +1031,7 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
         pNew = Gia_ManCleanup( pTemp = pNew );
         if ( (vGateMap || vObjMap) && (Gia_ManObjNum(pNew) < Gia_ManObjNum(pTemp)) )
             printf( "Cleanup removed objects after reading. Old gate/object abstraction maps are invalid!\n" );
+        Gia_AigerRemapFileLits( pvFileLits ? *pvFileLits : NULL, pTemp );
         Gia_ManStop( pTemp );
         pNew->vRegClasses  = vRegClasses;
         pNew->vRegInits    = vRegInits;
@@ -1135,6 +1185,7 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
         {
             pNew = Gia_ManDupZeroUndc( pTemp = pNew, pInit, 0, fGiaSimple, 1 );
             pNew->nConstrs = pTemp->nConstrs; pTemp->nConstrs = 0;
+            Gia_AigerRemapFileLits( pvFileLits ? *pvFileLits : NULL, pTemp );
             Gia_ManStop( pTemp );
         }
         ABC_FREE( pInit );
@@ -1194,6 +1245,10 @@ Gia_Man_t * Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSi
 ***********************************************************************/
 Gia_Man_t * Gia_AigerRead( char * pFileName, int fGiaSimple, int fSkipStrash, int fCheck )
 {
+    return Gia_AigerReadFileLits( pFileName, fGiaSimple, fSkipStrash, fCheck, NULL );
+}
+Gia_Man_t * Gia_AigerReadFileLits( char * pFileName, int fGiaSimple, int fSkipStrash, int fCheck, Vec_Int_t ** pvFileLits )
+{
     FILE * pFile;
     Gia_Man_t * pNew;
     char * pName, * pContents;
@@ -1208,7 +1263,7 @@ Gia_Man_t * Gia_AigerRead( char * pFileName, int fGiaSimple, int fSkipStrash, in
     RetValue = fread( pContents, nFileSize, 1, pFile );
     fclose( pFile );
 
-    pNew = Gia_AigerReadFromMemory( pContents, nFileSize, fGiaSimple, fSkipStrash, fCheck );
+    pNew = Gia_AigerReadFromMemoryFileLits( pContents, nFileSize, fGiaSimple, fSkipStrash, fCheck, pvFileLits );
     ABC_FREE( pContents );
     if ( pNew )
     {

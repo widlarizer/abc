@@ -1057,57 +1057,38 @@ void Gia_ManVerifyVerifyNameMapping( Gia_Man_t * p, Gia_Man_t * p1, Gia_Man_t * 
   Synopsis    [Rewrites spec literals in the mapping as literals of the spec file.]
 
   Description [The spec is structurally hashed while reading, which merges
-  duplicate and trivial AND gates and renumbers the remaining ones.  Reads
-  the file again without hashing and looks each gate up in the spec.]
+  duplicate and trivial AND gates and renumbers the remaining ones.
+  vFileLits maps each variable of the file to its literal in the spec.]
 
   SideEffects []
 
   SeeAlso     []
 
 ***********************************************************************/
-void Gia_ManVerifyMapToFileLits( Vec_Int_t * vMap, Gia_Man_t * pSpec, char * pFileSpec )
+void Gia_ManVerifyMapToFileLits( Vec_Int_t * vMap, Gia_Man_t * pSpec, Vec_Int_t * vFileLits )
 {
-    Gia_Man_t * pRaw = Gia_AigerRead( pFileSpec, 0, 1, 0 );
-    Vec_Int_t * vRaw2Spec = Vec_IntStartFull( Gia_ManObjNum(pRaw) );
     Vec_Int_t * vSpec2File = Vec_IntStartFull( Gia_ManObjNum(pSpec) );
     Gia_Obj_t * pObj;
-    int i, iLit, iLit0, iLit1;
-    assert( Gia_ManCiNum(pRaw) == Gia_ManCiNum(pSpec) && Gia_ManCoNum(pRaw) == Gia_ManCoNum(pSpec) );
-    Vec_IntWriteEntry( vRaw2Spec, 0, 0 );
-    Gia_ManForEachCi( pRaw, pObj, i )
-        Vec_IntWriteEntry( vRaw2Spec, Gia_ObjId(pRaw, pObj), Abc_Var2Lit(Gia_ObjId(pSpec, Gia_ManCi(pSpec, i)), 0) );
-    Gia_ManHashStart( pSpec );
-    Gia_ManForEachAnd( pRaw, pObj, i )
-    {
-        iLit0 = Vec_IntEntry( vRaw2Spec, Gia_ObjFaninId0(pObj, i) );
-        iLit1 = Vec_IntEntry( vRaw2Spec, Gia_ObjFaninId1(pObj, i) );
-        if ( iLit0 < 0 || iLit1 < 0 )
-            continue;
-        iLit = Gia_ManHashAndTry( pSpec, Abc_LitNotCond(iLit0, Gia_ObjFaninC0(pObj)), Abc_LitNotCond(iLit1, Gia_ObjFaninC1(pObj)) );
-        Vec_IntWriteEntry( vRaw2Spec, i, iLit );
-    }
-    Gia_ManHashStop( pSpec );
-    Vec_IntForEachEntry( vRaw2Spec, iLit, i )
+    int i, iLit, iFile;
+    Vec_IntForEachEntry( vFileLits, iLit, i )
         if ( iLit >= 0 && Vec_IntEntry(vSpec2File, Abc_Lit2Var(iLit)) == -1 )
             Vec_IntWriteEntry( vSpec2File, Abc_Lit2Var(iLit), Abc_Var2Lit(i, Abc_LitIsCompl(iLit)) );
     Gia_ManForEachCo( pSpec, pObj, i )
-        Vec_IntWriteEntry( vSpec2File, Gia_ObjId(pSpec, pObj), Abc_Var2Lit(Gia_ObjId(pRaw, Gia_ManCo(pRaw, i)), 0) );
+        Vec_IntWriteEntry( vSpec2File, Gia_ObjId(pSpec, pObj), Abc_Var2Lit(Vec_IntSize(vFileLits) + i, 0) );
     Vec_IntForEachEntry( vMap, iLit, i )
         if ( iLit >= 0 )
         {
-            int iFile = Vec_IntEntry( vSpec2File, Abc_Lit2Var(iLit) );
+            iFile = Vec_IntEntry( vSpec2File, Abc_Lit2Var(iLit) );
             Vec_IntWriteEntry( vMap, i, iFile < 0 ? -1 : Abc_LitNotCond(iFile, Abc_LitIsCompl(iLit)) );
         }
     Vec_IntFree( vSpec2File );
-    Vec_IntFree( vRaw2Spec );
-    Gia_ManStop( pRaw );
 }
 
 int Gia_ManVerifyWithBoxes( Gia_Man_t * pGia, int nBTLimit, int nTimeLim, int fSeq, int fObjIdMap, int fDumpFiles, int fVerbose, char * pFileSpec )
 {
     int Status   = -1;
     Gia_Man_t * pSpec, * pGia0, * pGia1, * pMiter;
-    Vec_Int_t * vBoxPres = NULL;
+    Vec_Int_t * vBoxPres = NULL, * vFileLits = NULL;
     if ( pFileSpec == NULL && pGia->pSpec == NULL )
     {
         printf( "Spec file is not given. Use standard flow.\n" );
@@ -1119,9 +1100,10 @@ int Gia_ManVerifyWithBoxes( Gia_Man_t * pGia, int nBTLimit, int nTimeLim, int fS
         return Status;
     }
     // read original AIG
-    pSpec = Gia_AigerRead( pFileSpec ? pFileSpec : pGia->pSpec, 0, 0, 0 );
+    pSpec = Gia_AigerReadFileLits( pFileSpec ? pFileSpec : pGia->pSpec, 0, 0, 0, fObjIdMap ? &vFileLits : NULL );
     if ( Gia_ManBoxNum(pSpec) && pSpec->pAigExtra == NULL )
     {
+        Vec_IntFreeP( &vFileLits );
         Gia_ManStop( pSpec );
         printf( "Spec has no box logic. Use standard flow.\n" );
         return Status;
@@ -1236,13 +1218,14 @@ int Gia_ManVerifyWithBoxes( Gia_Man_t * pGia, int nBTLimit, int nTimeLim, int fS
                 pGia->vEquLitIds = Gia_ManVerifyFindNameMapping( pMiter, pGia0, pGia1, vCopy0, vCopy1 );
                 assert( Vec_IntSize(pGia->vEquLitIds) == Gia_ManObjNum(pGia) );
                 Gia_ManVerifyVerifyNameMapping( pMiter, pGia0, pGia1, vCopy0, vCopy1, pGia->vEquLitIds );
-                Gia_ManVerifyMapToFileLits( pGia->vEquLitIds, pSpec, pFileSpec ? pFileSpec : pGia->pSpec );
+                Gia_ManVerifyMapToFileLits( pGia->vEquLitIds, pSpec, vFileLits );
                 Vec_IntFree( vCopy0 );
                 Vec_IntFree( vCopy1 );
             }
             Gia_ManStop( pMiter );
         }
     }
+    Vec_IntFreeP( &vFileLits );
     Gia_ManStop( pGia0 );
     Gia_ManStop( pGia1 );
     Gia_ManStop( pSpec );

@@ -1278,7 +1278,9 @@ static inline int         Gia_ObjCellId( Gia_Man_t * p, int iLit )          { re
 /*=== giaAiger.c ===========================================================*/
 extern int                 Gia_FileSize( char * pFileName );
 extern Gia_Man_t *         Gia_AigerReadFromMemory( char * pContents, int nFileSize, int fGiaSimple, int fSkipStrash, int fCheck );
+extern Gia_Man_t *         Gia_AigerReadFromMemoryFileLits( char * pContents, int nFileSize, int fGiaSimple, int fSkipStrash, int fCheck, Vec_Int_t ** pvFileLits );
 extern Gia_Man_t *         Gia_AigerRead( char * pFileName, int fGiaSimple, int fSkipStrash, int fCheck );
+extern Gia_Man_t *         Gia_AigerReadFileLits( char * pFileName, int fGiaSimple, int fSkipStrash, int fCheck, Vec_Int_t ** pvFileLits );
 extern void                Gia_AigerWrite( Gia_Man_t * p, char * pFileName, int fWriteSymbols, int fCompact, int fWriteNewLine );
 extern void                Gia_AigerWriteS( Gia_Man_t * p, char * pFileName, int fWriteSymbols, int fCompact, int fWriteNewLine, int fSkipComment );
 extern void                Gia_DumpAiger( Gia_Man_t * p, char * pFilePrefix, int iFileNum, int nFileNumDigits );
