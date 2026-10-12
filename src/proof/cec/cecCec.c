@@ -433,7 +433,9 @@ int Cec_ManVerify( Gia_Man_t * pInit, Cec_ParCec_t * pPars )
     int fDumpUndecided = 0;
     Cec_ParFra_t ParsFra, * pParsFra = &ParsFra;
     Gia_Man_t * p, * pNew;
-    int RetValue;
+    Gia_Obj_t * pObj;
+    Vec_Int_t * vCleanToInit = NULL;
+    int RetValue, i, iObj;
     abctime clk = Abc_Clock();
     abctime clkTotal = Abc_Clock();
     // consider special cases:
@@ -447,9 +449,18 @@ int Cec_ManVerify( Gia_Man_t * pInit, Cec_ParCec_t * pPars )
     p = Gia_ManDup( pInit );
     Gia_ManEquivFixOutputPairs( p );
     p = Gia_ManCleanup( pNew = p );
+    if ( pPars->fUseOrigIds )
+    {
+        // equivalences are found on the cleaned copy; remember how to number them like pInit
+        vCleanToInit = Vec_IntStartFull( Gia_ManObjNum(p) );
+        Gia_ManForEachObj( pNew, pObj, i )
+            if ( ~pObj->Value )
+                Vec_IntWriteEntry( vCleanToInit, Abc_Lit2Var(pObj->Value), i );
+    }
     Gia_ManStop( pNew );
     if ( pPars->fNaive )
     {
+        Vec_IntFreeP( &vCleanToInit );
         RetValue = Cec_ManVerifyNaive( p, pPars );
         Gia_ManStop( p );
         return RetValue;
@@ -471,6 +482,10 @@ int Cec_ManVerify( Gia_Man_t * pInit, Cec_ParCec_t * pPars )
     pParsFra->fDualOut     = 1;
     pNew = Cec_ManSatSweeping( p, pParsFra, pPars->fSilent );
     ABC_SWAP( Vec_Int_t *, pInit->vIdsEquiv, p->vIdsEquiv );
+    if ( vCleanToInit && pInit->vIdsEquiv )
+        Vec_IntForEachEntry( pInit->vIdsEquiv, iObj, i )
+            Vec_IntWriteEntry( pInit->vIdsEquiv, i, Vec_IntEntry(vCleanToInit, iObj) );
+    Vec_IntFreeP( &vCleanToInit );
     pPars->iOutFail = pParsFra->iOutFail;
     // update
     pInit->pCexComb = p->pCexComb; p->pCexComb = NULL;
