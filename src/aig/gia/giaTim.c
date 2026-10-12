@@ -1221,6 +1221,8 @@ int Gia_ManVerifyWithBoxes( Gia_Man_t * pGia, int nBTLimit, int nTimeLim, int fS
             if ( pPars->iOutFail >= 0 )
                 Abc_Print( 1, "Verification failed for at least one output (%d).\n", pPars->iOutFail );
             if ( fObjIdMap ) {
+                if ( pMiter->vIdsEquiv == NULL )
+                    pMiter->vIdsEquiv = Vec_IntAlloc( 0 );
                 Gia_Man_t * pReduced = Gia_ManOrigIdsReduce( pMiter, pMiter->vIdsEquiv );
                 Gia_ManStop( pReduced );
                 Gia_Obj_t * pObj; int i;           
